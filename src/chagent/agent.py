@@ -8,6 +8,7 @@ class AsyncAgent:
         self.model = model
         self.tools: List[Dict[str, Any]] = []
         self.tool_funcs: Dict[str, Callable] = {}
+        self.history: List[Dict[str, Any]] = []
         
     def register_tool(self, name: str, description: str, parameters: Dict[str, Any], func: Callable):
         """Register an async or sync Python skill as a tool."""
@@ -21,33 +22,44 @@ class AsyncAgent:
         })
         self.tool_funcs[name] = func
         
-    async def run(self, prompt: str):
-        print(f"\\n--- Agent starting task ---")
-        print(f"Task: {prompt}")
-        
-        messages = [{"role": "user", "content": prompt}]
+    async def stream_run(self, prompt: str):
+        self.history.append({"role": "user", "content": prompt})
         
         while True:
-            print("\\n[Agent Thinking...]")
+            yield {"type": "info", "content": "Agent Thinking..."}
+            
             response = await self.client.chat.completions.create(
                 model=self.model,
-                messages=messages,
+                messages=self.history,
                 tools=self.tools if self.tools else None,
             )
             
             msg = response.choices[0].message
             
-            if msg.content:
-                print(f"\\n🤖 Agent says: {msg.content}")
-            
             tool_calls = msg.tool_calls
+            is_fallback = False
             
             # Fallback for local models that output tool calls as JSON in content
             if not tool_calls and msg.content:
-                try:
-                    parsed = json.loads(msg.content)
-                    if isinstance(parsed, dict) and "name" in parsed and "arguments" in parsed:
-                        print(f"⚠️ Recovered tool call from content: {parsed['name']}")
+                fallback_calls = []
+                decoder = json.JSONDecoder()
+                s = msg.content
+                pos = 0
+                while pos < len(s):
+                    pos = s.find('{', pos)
+                    if pos == -1:
+                        break
+                    try:
+                        obj, new_pos = decoder.raw_decode(s, pos)
+                        if isinstance(obj, dict) and "name" in obj and "arguments" in obj:
+                            fallback_calls.append(obj)
+                        pos = new_pos
+                    except json.JSONDecodeError:
+                        pos += 1
+                        
+                if fallback_calls:
+                    tool_calls = []
+                    for idx, parsed in enumerate(fallback_calls):
                         class MockToolCall:
                             def __init__(self, id, name, arguments):
                                 self.id = id
@@ -56,16 +68,37 @@ class AsyncAgent:
                                         self.name = n
                                         self.arguments = a
                                 self.function = Function(name, arguments)
-                        tool_calls = [MockToolCall(id="call_fallback", name=parsed["name"], arguments=json.dumps(parsed["arguments"]))]
-                except json.JSONDecodeError:
-                    pass
+                        
+                        args = parsed["arguments"]
+                        args_str = json.dumps(args) if isinstance(args, dict) else str(args)
+                        tool_calls.append(MockToolCall(id=f"call_fallback_{idx}", name=parsed["name"], arguments=args_str))
+                    
+                    is_fallback = True
+
+            if msg.content and not is_fallback:
+                yield {"type": "message", "role": "assistant", "content": msg.content}
 
             # Convert msg to dict for appending to messages
-            # AsyncOpenAI v1 returns pydantic objects. Let's safely convert it
             msg_dict = msg.model_dump(exclude_none=True)
-            messages.append(msg_dict)
+            if is_fallback:
+                # Synthesize tool_calls for the context history so the LLM doesn't get confused
+                msg_dict["tool_calls"] = [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments
+                        }
+                    }
+                    for tc in tool_calls
+                ]
+                msg_dict["content"] = None
+                
+            self.history.append(msg_dict)
             
             if not tool_calls:
+                yield {"type": "finish"}
                 break
                 
             for tool_call in tool_calls:
@@ -76,7 +109,7 @@ class AsyncAgent:
                 except json.JSONDecodeError:
                     args = tool_call.function.arguments
                     
-                print(f"🛠️ Executing tool: {func_name}({args})")
+                yield {"type": "tool_call", "name": func_name, "args": args}
                 
                 if func_name in self.tool_funcs:
                     try:
@@ -91,12 +124,27 @@ class AsyncAgent:
                 else:
                     result = f"Unknown tool: {func_name}"
                     
-                print(f"📊 Tool result: {result}")
-                messages.append({
+                yield {"type": "tool_result", "name": func_name, "content": str(result)}
+                
+                self.history.append({
                     "role": "tool",
                     "tool_call_id": getattr(tool_call, "id", "call_fallback"),
                     "name": func_name,
                     "content": str(result)
                 })
+
+    async def run(self, prompt: str):
+        print(f"\n--- Agent starting task ---")
+        print(f"Task: {prompt}")
         
-        print("\\n--- Agent finished task ---")
+        async for event in self.stream_run(prompt):
+            if event["type"] == "info":
+                print(f"\n[{event['content']}]")
+            elif event["type"] == "message":
+                print(f"\n🤖 Agent says: {event['content']}")
+            elif event["type"] == "tool_call":
+                print(f"🛠️ Executing tool: {event['name']}({event['args']})")
+            elif event["type"] == "tool_result":
+                print(f"📊 Tool result: {event['content']}")
+                
+        print("\n--- Agent finished task ---")

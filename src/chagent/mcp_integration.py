@@ -54,9 +54,14 @@ class MCPManager:
             print(f"  ✅ Registered MCP tool: {tool.name}")
             
     async def close_all(self):
+        import asyncio
         for cm_client, cm_session in reversed(self.contexts):
             try:
-                await cm_session.__aexit__(None, None, None)
-                await cm_client.__aexit__(None, None, None)
-            except Exception as e:
-                print(f"Error closing MCP connection: {e}")
+                await asyncio.wait_for(cm_session.__aexit__(None, None, None), timeout=1.0)
+            except BaseException:
+                pass
+            
+            try:
+                await asyncio.wait_for(cm_client.__aexit__(None, None, None), timeout=1.0)
+            except BaseException:
+                pass

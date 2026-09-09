@@ -4,6 +4,8 @@ from .config import load_config
 from .llm_tester import get_working_client
 from .agent import AsyncAgent
 from .mcp_integration import MCPManager
+import uvicorn
+from .server import app
 
 async def get_weather(location: str) -> str:
     """Mock standard skill."""
@@ -39,10 +41,8 @@ async def async_main():
     # Init MCP manager
     mcp_manager = MCPManager(agent)
     
-    # Connect a sample MCP server
     import os
     env = os.environ.copy()
-    # Ensure standard paths are available for npx
     env["PATH"] = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:" + env.get("PATH", "")
     
     print("Starting MCP server...")
@@ -51,13 +51,38 @@ async def async_main():
     except Exception as e:
         print(f"Warning: Failed to start test MCP server: {e}")
     
-    try:
-        await agent.run("What's the weather in Tokyo? Also, use the echo tool to echo 'MCP is fully functional!'.")
-    finally:
-        await mcp_manager.close_all()
+    if len(sys.argv) > 1 and sys.argv[1] == "serve":
+        app.state.agent = agent
+        
+        import socket
+        port = 4217
+        while True:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                if s.connect_ex(('127.0.0.1', port)) != 0:
+                    break
+            port += 1
+            
+        print(f"\n🚀 Веб-сервер запущен! Откройте в браузере: http://127.0.0.1:{port}\n")
+        
+        server_config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info")
+        server = uvicorn.Server(server_config)
+        
+        try:
+            await server.serve()
+        finally:
+            await mcp_manager.close_all()
+    else:
+        try:
+            print("\nЗапуск в режиме CLI. Для веб-сервера используйте флаг 'serve'.")
+            await agent.run("What's the weather in Tokyo? Also, use the echo tool to echo 'MCP is fully functional!'.")
+        finally:
+            await mcp_manager.close_all()
 
 def main():
-    asyncio.run(async_main())
+    try:
+        asyncio.run(async_main())
+    except KeyboardInterrupt:
+        pass
 
 if __name__ == "__main__":
     main()

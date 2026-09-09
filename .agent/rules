@@ -1,6 +1,0 @@
-# Python & Agent Rules
-- Use modern Python 3.12+ features (type hinting, async/await).
-- Manage dependencies and virtual environments with `uv`.
-- Keep the agent logic modular: separate LLM client, tool execution, and MCP communication.
-- Use `pydantic` for configuration management and data validation.
-- Standard tools should be pure Python functions with clear docstrings for the LLM to understand.
