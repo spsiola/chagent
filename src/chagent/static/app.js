@@ -2,7 +2,7 @@ const chatContainer = document.getElementById('chat-container');
 const chatForm = document.getElementById('chat-form');
 const messageInput = document.getElementById('message-input');
 const statusDiv = document.getElementById('connection-status');
-const statusText = statusDiv.querySelector('.status-text');
+const modelSelect = document.getElementById('model-select');
 
 let ws = null;
 let currentInfoElement = null;
@@ -12,13 +12,15 @@ function connectWebSocket() {
     ws = new WebSocket(`${protocol}//${window.location.host}/ws/chat`);
 
     ws.onopen = () => {
+        statusDiv.classList.remove('testing');
         statusDiv.classList.add('connected');
-        statusText.textContent = 'Connected';
+        statusDiv.title = 'Connected';
+        fetchModels();
     };
 
     ws.onclose = () => {
         statusDiv.classList.remove('connected');
-        statusText.textContent = 'Disconnected';
+        statusDiv.title = 'Disconnected';
         setTimeout(connectWebSocket, 3000); // Reconnect after 3s
     };
 
@@ -26,6 +28,72 @@ function connectWebSocket() {
         const data = JSON.parse(event.data);
         handleAgentEvent(data);
     };
+}
+
+async function fetchModels() {
+    try {
+        const res = await fetch('/api/models');
+        const data = await res.json();
+        
+        if (data.models && data.models.length > 0) {
+            modelSelect.innerHTML = '';
+            data.models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = JSON.stringify({ provider_name: m.provider, model_name: m.model });
+                opt.textContent = `${m.provider}: ${m.model}`;
+                if (data.current_model === m.model) {
+                    opt.selected = true;
+                }
+                modelSelect.appendChild(opt);
+            });
+            modelSelect.style.display = 'inline-block';
+        }
+    } catch (e) {
+        console.error("Failed to fetch models", e);
+    }
+}
+
+if (modelSelect) {
+    modelSelect.addEventListener('change', async (e) => {
+        const val = JSON.parse(e.target.value);
+        modelSelect.disabled = true;
+        statusDiv.classList.remove('connected');
+        statusDiv.classList.remove('error');
+        statusDiv.classList.add('testing');
+        statusDiv.title = 'Testing...';
+        try {
+            const res = await fetch('/api/models/switch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(val)
+            });
+            const data = await res.json();
+            statusDiv.classList.remove('testing');
+            if (!data.success) {
+                statusDiv.classList.remove('connected');
+                statusDiv.title = 'Model Error';
+                messageInput.disabled = true;
+                document.getElementById('send-button').disabled = true;
+                document.getElementById('send-button').style.opacity = '0.5';
+            } else {
+                statusDiv.classList.add('connected');
+                statusDiv.title = 'Connected';
+                messageInput.disabled = false;
+                document.getElementById('send-button').disabled = false;
+                document.getElementById('send-button').style.opacity = '1';
+            }
+        } catch (err) {
+            console.error(err);
+            statusDiv.classList.remove('testing');
+            statusDiv.classList.remove('connected');
+            statusDiv.title = 'Model Error';
+            messageInput.disabled = true;
+            document.getElementById('send-button').disabled = true;
+            document.getElementById('send-button').style.opacity = '0.5';
+        } finally {
+            modelSelect.disabled = false;
+        }
+    });
 }
 
 // Copy dialog functionality
@@ -36,11 +104,21 @@ if (copyBtn) {
         const children = chatContainer.children;
         for (let child of children) {
             if (child.classList.contains('message') && child.classList.contains('user')) {
-                log += `Пользователь: ${child.innerText.trim()}\n\n`;
+                log += `\nПользователь: ${child.innerText.trim()}\n\n`;
             } else if (child.classList.contains('message') && child.classList.contains('ai')) {
-                log += `Модель: ${child.innerText.trim()}\n\n`;
+                const modelInfo = child.dataset.model ? ` [${child.dataset.model}]` : '';
+                log += `Модель${modelInfo}: ${child.innerText.trim()}\n\n`;
             } else if (child.classList.contains('tool-event')) {
                 log += `Инструмент:\n${child.innerText.trim()}\n\n`;
+            } else if (child.classList.contains('harness-logs-container')) {
+                const toggle = document.getElementById('toggle-harness-logs');
+                if (toggle && toggle.checked) {
+                    for (let logNode of child.children) {
+                        if (logNode.classList.contains('harness-log')) {
+                            log += `${logNode.innerText.trim()}\n`;
+                        }
+                    }
+                }
             }
         }
         
@@ -52,6 +130,17 @@ if (copyBtn) {
             console.error('Copy failed', err);
             alert('Не удалось скопировать лог');
         });
+    });
+}
+
+const toggleHarnessLogs = document.getElementById('toggle-harness-logs');
+if (toggleHarnessLogs) {
+    toggleHarnessLogs.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            chatContainer.classList.remove('hide-harness');
+        } else {
+            chatContainer.classList.add('hide-harness');
+        }
     });
 }
 
@@ -80,6 +169,9 @@ function handleAgentEvent(event) {
         removeInfoElement();
         const msgEl = document.createElement('div');
         msgEl.className = 'message ai';
+        if (event.model && event.provider) {
+            msgEl.dataset.model = `${event.provider}/${event.model}`;
+        }
         
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
@@ -112,8 +204,39 @@ function handleAgentEvent(event) {
         chatContainer.appendChild(toolEl);
         scrollToBottom();
     }
+    else if (event.type === 'tool_result') {
+        removeInfoElement();
+        const resEl = document.createElement('div');
+        resEl.className = 'tool-event tool-result';
+        resEl.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+        resEl.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+        resEl.style.color = '#10b981';
+        
+        resEl.innerHTML = `
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="flex-shrink:0"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            <div style="flex:1; overflow-x: hidden;">
+                Результат инструмента:
+                <pre>${event.content}</pre>
+            </div>
+        `;
+        chatContainer.appendChild(resEl);
+        scrollToBottom();
+    }
     else if (event.type === 'finish') {
         removeInfoElement();
+    }
+    else if (event.type === 'harness_log') {
+        let container = chatContainer.lastElementChild;
+        if (!container || !container.classList.contains('harness-logs-container')) {
+            container = document.createElement('div');
+            container.className = 'harness-logs-container';
+            chatContainer.appendChild(container);
+        }
+        const logEl = document.createElement('div');
+        logEl.className = 'harness-log';
+        logEl.textContent = event.content;
+        container.appendChild(logEl);
+        scrollToBottom();
     }
     else if (event.type === 'error') {
         removeInfoElement();

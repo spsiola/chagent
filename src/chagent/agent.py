@@ -3,12 +3,13 @@ from typing import List, Dict, Any, Callable
 from openai import AsyncOpenAI
 
 class AsyncAgent:
-    def __init__(self, client: AsyncOpenAI, model: str):
+    def __init__(self, client: AsyncOpenAI, model: str, system_prompt: str = "You are a helpful AI assistant. You can use tools to answer user questions.", provider_name: str = "unknown"):
         self.client = client
         self.model = model
+        self.provider_name = provider_name
         self.tools: List[Dict[str, Any]] = []
         self.tool_funcs: Dict[str, Callable] = {}
-        self.history: List[Dict[str, Any]] = []
+        self.history: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
         
     def register_tool(self, name: str, description: str, parameters: Dict[str, Any], func: Callable):
         """Register an async or sync Python skill as a tool."""
@@ -76,7 +77,13 @@ class AsyncAgent:
                     is_fallback = True
 
             if msg.content and not is_fallback:
-                yield {"type": "message", "role": "assistant", "content": msg.content}
+                yield {
+                    "type": "message", 
+                    "role": "assistant", 
+                    "content": msg.content,
+                    "model": self.model,
+                    "provider": getattr(self, "provider_name", "unknown")
+                }
 
             # Convert msg to dict for appending to messages
             msg_dict = msg.model_dump(exclude_none=True)

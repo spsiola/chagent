@@ -1,18 +1,61 @@
 import os
 import json
+import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from openai import AsyncOpenAI
+from .config import load_config
+from .llm_tester import test_model
+
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if hasattr(app.state, 'initialize_system_func'):
+        asyncio.create_task(app.state.initialize_system_func(app.state.manager.broadcast_harness_log))
+    yield
+    if getattr(app.state, 'mcp_manager', None):
+        await app.state.mcp_manager.close_all()
 
 # Initialize FastAPI app
-app = FastAPI(title="chagent", description="AI Agent with MCP support")
+app = FastAPI(title="chagent", description="AI Agent with MCP support", lifespan=lifespan)
 
-# We will mount static files, but if index.html is there we can also serve it directly on GET /
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 if not os.path.exists(STATIC_DIR):
     os.makedirs(STATIC_DIR)
     
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+        self.harness_logs: list[str] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        # Send past harness logs to newly connected clients
+        for log in self.harness_logs:
+            await websocket.send_json({"type": "harness_log", "content": log})
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast_harness_log(self, message: str):
+        self.harness_logs.append(message)
+        for connection in self.active_connections:
+            try:
+                await connection.send_json({"type": "harness_log", "content": message})
+            except Exception:
+                pass
+
+manager = ConnectionManager()
+app.state.manager = manager
+app.state.agent_ready = asyncio.Event()
+app.state.agent = None
 
 @app.get("/")
 async def get_index():
@@ -22,13 +65,77 @@ async def get_index():
             return HTMLResponse(f.read())
     return HTMLResponse("<h1>Static files not found. Please create index.html in static directory.</h1>")
 
+class SwitchModelRequest(BaseModel):
+    provider_name: str
+    model_name: str
+
+@app.get("/api/models")
+async def get_models():
+    config = load_config()
+    models_list = []
+    current_provider = None
+    for provider in config.providers:
+        for model in provider.models:
+            models_list.append({"provider": provider.name, "model": model})
+            
+    current_agent = app.state.agent
+    current_active_model = None
+    if current_agent:
+        current_active_model = current_agent.model
+        # Optional: try to find current provider by matching base_url/api_key
+        # but just returning current_model is enough for UI.
+
+    return {"models": models_list, "current_model": current_active_model}
+
+@app.post("/api/models/switch")
+async def switch_model(request: SwitchModelRequest):
+    config = load_config()
+    target_provider = None
+    for p in config.providers:
+        if p.name == request.provider_name:
+            target_provider = p
+            break
+            
+    if not target_provider:
+        return {"success": False, "error": "Provider not found"}
+        
+    if request.model_name not in target_provider.models:
+        return {"success": False, "error": "Model not found in provider"}
+        
+    app.state.agent_ready.clear()
+    await app.state.manager.broadcast_harness_log(f"Harness: Switching to model {request.model_name} (Provider: {request.provider_name})...")
+    
+    # Initialize client
+    api_key = target_provider.api_key
+    if api_key.startswith("ENV_"):
+        env_var = api_key[4:]
+        api_key = os.environ.get(env_var, "placeholder")
+        
+    client = AsyncOpenAI(
+        base_url=target_provider.base_url,
+        api_key=api_key,
+    )
+    
+    # Test model
+    success = await test_model(client, request.model_name, app.state.manager.broadcast_harness_log)
+    if success:
+        if app.state.agent:
+            app.state.agent.client = client
+            app.state.agent.model = request.model_name
+            app.state.agent.provider_name = request.provider_name
+            await app.state.manager.broadcast_harness_log(f"Harness: ✅ Successfully switched to model '{request.model_name}'")
+        else:
+            await app.state.manager.broadcast_harness_log("Harness: Agent not initialized yet, cannot switch.")
+            success = False
+    else:
+        await app.state.manager.broadcast_harness_log(f"Harness: ❌ Failed to switch. Chat disabled until a working model is selected.")
+        
+    app.state.agent_ready.set()
+    return {"success": success}
+
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    
-    # We retrieve the agent from the app state (set up in main.py)
-    agent = app.state.agent
-    
+    await manager.connect(websocket)
     try:
         while True:
             # Receive text from client
@@ -42,7 +149,21 @@ async def websocket_endpoint(websocket: WebSocket):
                 
             if not prompt:
                 continue
-                
+            
+            # Message queuing logic
+            if not app.state.agent_ready.is_set():
+                timeout = getattr(app.state, "startup_timeout", 30)
+                try:
+                    await asyncio.wait_for(app.state.agent_ready.wait(), timeout=timeout)
+                except asyncio.TimeoutError:
+                    await manager.broadcast_harness_log(f"Harness: Сообщение не обработано и сброшено. ЛЛМ не загрузилась за {timeout} сек.")
+                    continue
+            
+            agent = app.state.agent
+            if not agent:
+                await manager.broadcast_harness_log("Harness: Сообщение сброшено, инициализация провалилась.")
+                continue
+
             # Stream events back to the client
             try:
                 async for event in agent.stream_run(prompt):
@@ -51,4 +172,4 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({"type": "error", "content": str(e)})
                 
     except WebSocketDisconnect:
-        print("Client disconnected")
+        manager.disconnect(websocket)

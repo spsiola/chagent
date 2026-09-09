@@ -10,6 +10,7 @@ class ProviderConfig(BaseModel):
     models: List[str]
 
 class AppConfig(BaseModel):
+    startup_timeout: int = 30
     providers: List[ProviderConfig]
 
 def load_config(path: str = "config.yaml") -> AppConfig:
