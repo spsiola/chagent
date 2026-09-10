@@ -7,6 +7,8 @@ SETTINGS_FILE = "data/settings.json"
 class AppSettings(BaseModel):
     theme: str = "dark" # "light", "dark", "system"
     timezone: str = "UTC"
+    safe_mode: bool = True
+    allowed_roots: list[str] = ["./"]
 
 def load_settings() -> AppSettings:
     if os.path.exists(SETTINGS_FILE):

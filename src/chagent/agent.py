@@ -25,6 +25,11 @@ class AsyncAgent:
         })
         self.tool_funcs[name] = func
         
+    def _estimate_tokens(self, text: str) -> int:
+        ascii_count = sum(1 for c in text if ord(c) < 128)
+        non_ascii_count = len(text) - ascii_count
+        return int((ascii_count / 4) + (non_ascii_count / 1.5))
+        
     async def stream_run(self, prompt: str):
         self.history.append({"role": "user", "content": prompt})
         
@@ -33,6 +38,12 @@ class AsyncAgent:
             self.history[0]["content"] = self.prompt_builder_func(self.base_system_prompt, self.tools)
         
         while True:
+            # Расчет метрик токенов
+            history_str = json.dumps(self.history, ensure_ascii=False)
+            chars = len(history_str)
+            tokens = self._estimate_tokens(history_str)
+            yield {"type": "metrics", "chars": chars, "tokens": tokens}
+            
             yield {"type": "info", "content": "Agent Thinking..."}
             
             response = await self.client.chat.completions.create(

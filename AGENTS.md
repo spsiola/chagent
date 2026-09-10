@@ -26,3 +26,14 @@ Whenever you are asked to design a new feature or debug an architectural issue, 
 - All changes must be tracked formally in `docs/CHANGELOG.md`.
 - `docs/CHANGELOG.md` is strictly **append-only** (newer versions at the top). Do not edit or rewrite the history of older versions.
 - A new version entry should only be added when making a version commit. Describe changes in more detail than a standard git commit message.
+
+## 5. When Committing a Version
+When a user requests to commit a new version, the following steps are strictly required: 
+1. **Analyze:** View the `git diff` and review the contents of the current dialog to understand all changes made.
+2. **Version Bump:** Determine the new version number (following Semantic Versioning) and update the version field in `docs/STATE.md`.
+3. **Documentation:** 
+   - Update `docs/CHANGELOG.md` with a detailed new version entry.
+   - Ensure all high-level changes are reflected in `docs/STATE.md` and `docs/ARCHITECTURE.md`.
+   - Check `docs/ROADMAP.md` and check off any completed tasks.
+4. **Commit:** Stage all changes and make a Git commit with a clear, descriptive message (e.g., "Release v0.5.0: Added sandboxing security").
+5. **Push:** Push the commit to the remote GitHub repository.

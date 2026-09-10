@@ -76,7 +76,7 @@ async def initialize_system(log_callback=_default_logger):
         )
         
         # Регистрируем нативные инструменты для работы с ФС и ОС
-        register_native_tools(agent)
+        register_native_tools(agent, app.state.settings)
         
         # Register a standard skill
         agent.register_tool(

@@ -157,6 +157,16 @@ function removeInfoElement() {
 }
 
 function handleAgentEvent(event) {
+    if (event.type === 'metrics') {
+        const metricsEl = document.getElementById('metrics-status');
+        const metricsText = document.getElementById('metrics-text');
+        if (metricsEl && metricsText) {
+            metricsEl.style.display = 'flex';
+            metricsText.textContent = `~${event.tokens} tokens`;
+        }
+        return; // Метрики не должны отображаться в самом чате
+    }
+    
     if (event.type === 'info') {
         removeInfoElement();
         const infoEl = document.createElement('div');
