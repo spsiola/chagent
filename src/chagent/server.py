@@ -5,9 +5,11 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from typing import Optional
 from openai import AsyncOpenAI
 from .config import load_config
 from .llm_tester import test_model
+from .settings import AppSettings, save_settings
 
 from contextlib import asynccontextmanager
 
@@ -123,6 +125,12 @@ async def switch_model(request: SwitchModelRequest):
             app.state.agent.client = client
             app.state.agent.model = request.model_name
             app.state.agent.provider_name = request.provider_name
+            
+            # Обновляем системный промпт для новой модели
+            if hasattr(app.state, 'memory_manager'):
+                new_prompt = app.state.memory_manager.get_prompt_for_model(f"{request.provider_name}/{request.model_name}")
+                app.state.agent.base_system_prompt = new_prompt
+                
             await app.state.manager.broadcast_harness_log(f"Harness: ✅ Successfully switched to model '{request.model_name}'")
         else:
             await app.state.manager.broadcast_harness_log("Harness: Agent not initialized yet, cannot switch.")
@@ -132,6 +140,57 @@ async def switch_model(request: SwitchModelRequest):
         
     app.state.agent_ready.set()
     return {"success": success}
+
+# --- Settings & Memory API ---
+
+@app.get("/api/settings")
+async def get_settings():
+    if hasattr(app.state, 'settings'):
+        return app.state.settings.model_dump()
+    return {}
+
+@app.post("/api/settings")
+async def update_settings(settings: AppSettings):
+    app.state.settings = settings
+    save_settings(settings)
+    return {"success": True}
+
+@app.get("/api/memory/prompts")
+async def get_prompts():
+    if hasattr(app.state, 'memory_manager'):
+        return app.state.memory_manager.get_all_prompts()
+    return {}
+
+class UpdatePromptRequest(BaseModel):
+    model_id: Optional[str] = None # "default" or "provider/model"
+    prompt: Optional[str] = None
+    tool_rules: Optional[str] = None
+    system_template: Optional[str] = None
+
+@app.post("/api/memory/prompts")
+async def update_prompt(req: UpdatePromptRequest):
+    if hasattr(app.state, 'memory_manager'):
+        if req.tool_rules is not None:
+            app.state.memory_manager.update_tool_rules(req.tool_rules)
+            
+        if req.system_template is not None:
+            app.state.memory_manager.update_system_template(req.system_template)
+            
+        if req.model_id and req.prompt is not None:
+            if req.model_id == "default":
+                app.state.memory_manager.update_default_prompt(req.prompt)
+            else:
+                app.state.memory_manager.update_model_prompt(req.model_id, req.prompt)
+                
+            # Если промпт обновлен для текущей модели (или дефолтный), сразу обновляем агента
+            agent = app.state.agent
+            if agent:
+                current_id = f"{agent.provider_name}/{agent.model}"
+                if req.model_id == current_id or (req.model_id == "default" and current_id not in app.state.memory_manager.prompts.models):
+                    agent.base_system_prompt = req.prompt
+                    
+        return {"success": True}
+    return {"success": False, "error": "Memory manager not initialized"}
 
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):

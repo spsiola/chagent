@@ -3,13 +3,15 @@ from typing import List, Dict, Any, Callable
 from openai import AsyncOpenAI
 
 class AsyncAgent:
-    def __init__(self, client: AsyncOpenAI, model: str, system_prompt: str = "You are a helpful AI assistant. You can use tools to answer user questions.", provider_name: str = "unknown"):
+    def __init__(self, client: AsyncOpenAI, model: str, system_prompt: str = "You are a helpful AI assistant. You can use tools to answer user questions.", provider_name: str = "unknown", prompt_builder_func: Callable = None):
         self.client = client
         self.model = model
         self.provider_name = provider_name
         self.tools: List[Dict[str, Any]] = []
         self.tool_funcs: Dict[str, Callable] = {}
-        self.history: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+        self.base_system_prompt = system_prompt
+        self.prompt_builder_func = prompt_builder_func
+        self.history: List[Dict[str, Any]] = [{"role": "system", "content": self.base_system_prompt}]
         
     def register_tool(self, name: str, description: str, parameters: Dict[str, Any], func: Callable):
         """Register an async or sync Python skill as a tool."""
@@ -25,6 +27,10 @@ class AsyncAgent:
         
     async def stream_run(self, prompt: str):
         self.history.append({"role": "user", "content": prompt})
+        
+        # Инъекция списка доступных инструментов через билдер контекста
+        if self.history and self.history[0].get("role") == "system" and self.prompt_builder_func:
+            self.history[0]["content"] = self.prompt_builder_func(self.base_system_prompt, self.tools)
         
         while True:
             yield {"type": "info", "content": "Agent Thinking..."}

@@ -20,6 +20,10 @@
                     <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                     Логи
                 </label>
+                <button id="settings-btn" class="header-btn" title="Настройки">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    Настройки
+                </button>
                 <button id="copy-dialog-btn" class="header-btn" title="Скопировать диалог">
                     <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                     Скопировать диалог
@@ -47,6 +51,69 @@
             </form>
         </div>
     </div>
-    <script src="/static/app.js?v=5"></script>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Настройки</h2>
+                <button id="close-settings-btn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-tabs">
+                <button class="tab-btn active" data-tab="tab-prompts">Память и Промпты</button>
+                <button class="tab-btn" data-tab="tab-template">Структура контекста</button>
+                <button class="tab-btn" data-tab="tab-app">Интерфейс</button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Prompts Tab -->
+                <div id="tab-prompts" class="tab-content active">
+                    <div class="form-group">
+                        <label for="prompt-context-select">Контекст модели</label>
+                        <select id="prompt-context-select" class="form-control">
+                            <option value="default">По умолчанию (все модели)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label id="system-prompt-label" for="system-prompt-textarea">Системный промпт</label>
+                        <textarea id="system-prompt-textarea" class="form-control" rows="8"></textarea>
+                    </div>
+                    <button id="save-prompt-btn" class="primary-btn">Сохранить промпт</button>
+                </div>
+                
+                <!-- Template Tab -->
+                <div id="tab-template" class="tab-content">
+                    <div class="form-group">
+                        <label for="system-template-textarea">Шаблон системы</label>
+                        <textarea id="system-template-textarea" class="form-control" rows="5" style="font-family: monospace;"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="tool-rules-textarea">Правила инструментов</label>
+                        <textarea id="tool-rules-textarea" class="form-control" rows="4"></textarea>
+                    </div>
+                    <button id="save-template-btn" class="primary-btn">Сохранить структуру</button>
+                </div>
+                
+                <!-- App Settings Tab -->
+                <div id="tab-app" class="tab-content">
+                    <div class="form-group">
+                        <label for="theme-select">Тема оформления</label>
+                        <select id="theme-select" class="form-control">
+                            <option value="dark">Тёмная</option>
+                            <option value="light">Светлая</option>
+                            <option value="system">Системная</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="timezone-input">Часовой пояс</label>
+                        <input type="text" id="timezone-input" class="form-control" value="UTC">
+                    </div>
+                    <button id="save-settings-btn" class="primary-btn">Сохранить настройки</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=6"></script>
 </body>
 </html>

@@ -52,3 +52,6 @@ venv.bak/
 # Logs
 logs/
 *.log
+
+# Instance Data
+data/

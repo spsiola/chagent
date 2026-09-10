@@ -1,9 +1,14 @@
 import sys
+import os
 import asyncio
 from .config import load_config
 from .llm_tester import get_working_client
 from .agent import AsyncAgent
 from .mcp_integration import MCPManager
+from .skill_loader import load_skills
+from .mcp_loader import load_mcp_configs
+from .memory_manager import MemoryManager
+from .settings import load_settings
 import uvicorn
 from .server import app
 
@@ -11,7 +16,10 @@ async def get_weather(location: str) -> str:
     """Mock standard skill."""
     return f"The weather in {location} is sunny and 25°C."
 
-async def initialize_system(log_callback=print):
+async def _default_logger(msg: str) -> None:
+    print(msg)
+
+async def initialize_system(log_callback=_default_logger):
     try:
         await log_callback("Harness: Loading config...")
         config = load_config()
@@ -24,11 +32,41 @@ async def initialize_system(log_callback=print):
             await log_callback("Harness: Fatal: Could not initialize any LLM.")
             return
             
+        # Создаем базовые директории, если их нет
+        for d in ["data", "data/skills", "data/memory"]:
+            os.makedirs(d, exist_ok=True)
+            
+        # Seeding: если рабочие файлы/директории пусты, копируем из init_memory
+        import shutil
+        init_mcp = "init_memory/mcp_config.json"
+        data_mcp = "data/mcp_config.json"
+        if not os.path.exists(data_mcp) and os.path.exists(init_mcp):
+            shutil.copy2(init_mcp, data_mcp)
+            
+        init_skills_dir = "init_memory/skills"
+        data_skills_dir = "data/skills"
+        if os.path.exists(init_skills_dir) and not os.listdir(data_skills_dir):
+            for item in os.listdir(init_skills_dir):
+                s = os.path.join(init_skills_dir, item)
+                d = os.path.join(data_skills_dir, item)
+                if os.path.isdir(s):
+                    shutil.copytree(s, d, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(s, d)
+            
+        app.state.settings = load_settings()
+        app.state.memory_manager = MemoryManager()
+        
+        prompt = app.state.memory_manager.get_prompt_for_model(f"{provider_name}/{model}")
+        
+        prompt_builder = lambda base_prompt, tools: app.state.memory_manager.build_system_prompt(f"{app.state.agent.provider_name}/{app.state.agent.model}" if hasattr(app.state, 'agent') and app.state.agent else f"{provider_name}/{model}", tools)
+        
         agent = AsyncAgent(
             client, 
             model, 
-            system_prompt="Вы полезный ИИ-ассистент. У вас есть инструменты (tools). Если пользователь задает вопрос (например, о погоде), для которого есть инструмент, вы ОБЯЗАНЫ вызвать инструмент, а не отказываться отвечать. Отвечайте всегда на русском языке.",
-            provider_name=provider_name
+            system_prompt=prompt,
+            provider_name=provider_name,
+            prompt_builder_func=prompt_builder
         )
         
         # Register a standard skill
@@ -46,8 +84,12 @@ async def initialize_system(log_callback=print):
         )
         
         app.state.mcp_manager = MCPManager(agent)
+            
+        # Загружаем скилы из SKILL.md
+        await load_skills(agent, log_callback=log_callback)
         
-        # (We removed the default test MCP server-everything here because it confuses small models like 7b with generic tools like echo)
+        # Загружаем MCP серверы
+        await load_mcp_configs(app.state.mcp_manager, log_callback=log_callback)
         
         # Set agent and trigger event
         app.state.agent = agent

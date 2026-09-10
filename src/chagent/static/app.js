@@ -61,6 +61,8 @@ if (modelSelect) {
         statusDiv.classList.remove('error');
         statusDiv.classList.add('testing');
         statusDiv.title = 'Testing...';
+        document.getElementById('send-button').disabled = true;
+        document.getElementById('send-button').style.opacity = '0.5';
         try {
             const res = await fetch('/api/models/switch', {
                 method: 'POST',
@@ -72,13 +74,11 @@ if (modelSelect) {
             if (!data.success) {
                 statusDiv.classList.remove('connected');
                 statusDiv.title = 'Model Error';
-                messageInput.disabled = true;
                 document.getElementById('send-button').disabled = true;
                 document.getElementById('send-button').style.opacity = '0.5';
             } else {
                 statusDiv.classList.add('connected');
                 statusDiv.title = 'Connected';
-                messageInput.disabled = false;
                 document.getElementById('send-button').disabled = false;
                 document.getElementById('send-button').style.opacity = '1';
             }
@@ -87,7 +87,6 @@ if (modelSelect) {
             statusDiv.classList.remove('testing');
             statusDiv.classList.remove('connected');
             statusDiv.title = 'Model Error';
-            messageInput.disabled = true;
             document.getElementById('send-button').disabled = true;
             document.getElementById('send-button').style.opacity = '0.5';
         } finally {
@@ -119,6 +118,8 @@ if (copyBtn) {
                         }
                     }
                 }
+            } else if (child.classList.contains('error-event')) {
+                log += `${child.innerText.trim()}\n\n`;
             }
         }
         
@@ -241,9 +242,9 @@ function handleAgentEvent(event) {
     else if (event.type === 'error') {
         removeInfoElement();
         const infoEl = document.createElement('div');
-        infoEl.className = 'info-event';
+        infoEl.className = 'info-event error-event';
         infoEl.style.color = '#ef4444';
-        infoEl.textContent = `Ошибка: ${event.content}`;
+        infoEl.textContent = `Harness: Ошибка: ${event.content}`;
         chatContainer.appendChild(infoEl);
         scrollToBottom();
     }
@@ -273,3 +274,218 @@ chatForm.addEventListener('submit', (e) => {
 
 // Init
 connectWebSocket();
+
+// --- Settings Modal Logic ---
+const settingsBtn = document.getElementById('settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const closeSettingsBtn = document.getElementById('close-settings-btn');
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+
+// Settings DOM Elements
+const themeSelect = document.getElementById('theme-select');
+const timezoneInput = document.getElementById('timezone-input');
+const saveSettingsBtn = document.getElementById('save-settings-btn');
+
+// Prompts DOM Elements
+const promptContextSelect = document.getElementById('prompt-context-select');
+const systemPromptTextarea = document.getElementById('system-prompt-textarea');
+const savePromptBtn = document.getElementById('save-prompt-btn');
+
+let currentPromptsData = { default: "", models: {} };
+
+settingsBtn.addEventListener('click', async () => {
+    settingsModal.classList.add('show');
+    await loadSettingsAndPrompts();
+});
+
+closeSettingsBtn.addEventListener('click', () => {
+    settingsModal.classList.remove('show');
+});
+
+// Close modal when clicking outside
+window.addEventListener('click', (e) => {
+    if (e.target === settingsModal) {
+        settingsModal.classList.remove('show');
+    }
+});
+
+// Tab switching logic
+tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+        
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+});
+
+async function loadSettingsAndPrompts() {
+    try {
+        // Load App Settings
+        const settingsRes = await fetch('/api/settings');
+        const settings = await settingsRes.json();
+        if (settings.theme) themeSelect.value = settings.theme;
+        if (settings.timezone) timezoneInput.value = settings.timezone;
+        applyTheme(settings.theme || 'dark');
+        
+        // Load Prompts
+        const promptsRes = await fetch('/api/memory/prompts');
+        currentPromptsData = await promptsRes.json();
+        
+        if (currentPromptsData.system_template) {
+            document.getElementById('system-template-textarea').value = currentPromptsData.system_template;
+        }
+        if (currentPromptsData.tool_rules) {
+            document.getElementById('tool-rules-textarea').value = currentPromptsData.tool_rules;
+        }
+        
+        // Populate model dropdown for prompts (based on currently available models from the header select)
+        promptContextSelect.innerHTML = '<option value="default">По умолчанию (все модели)</option>';
+        if (modelSelect && modelSelect.options) {
+            Array.from(modelSelect.options).forEach(opt => {
+                try {
+                    const m = JSON.parse(opt.value);
+                    const id = `${m.provider_name}/${m.model_name}`;
+                    const el = document.createElement('option');
+                    el.value = id;
+                    el.textContent = `${m.provider_name}: ${m.model_name}`;
+                    promptContextSelect.appendChild(el);
+                } catch(e) {}
+            });
+        }
+        
+        updatePromptTextarea();
+    } catch (e) {
+        console.error("Error loading settings/prompts:", e);
+    }
+}
+
+function updatePromptTextarea() {
+    const selected = promptContextSelect.value;
+    const label = document.getElementById('system-prompt-label');
+    
+    if (selected === 'default') {
+        systemPromptTextarea.value = currentPromptsData.default || '';
+        systemPromptTextarea.style.fontStyle = 'normal';
+        if (label) label.textContent = 'Системный промпт (По умолчанию)';
+    } else {
+        const modelPrompt = currentPromptsData.models && currentPromptsData.models[selected];
+        if (modelPrompt) {
+            systemPromptTextarea.value = modelPrompt;
+            systemPromptTextarea.style.fontStyle = 'normal';
+            if (label) label.textContent = 'Системный промпт';
+        } else {
+            // Если для конкретной модели еще не задан, показываем дефолтный
+            systemPromptTextarea.value = currentPromptsData.default || '';
+            systemPromptTextarea.style.fontStyle = 'italic';
+            if (label) label.textContent = 'Системный промпт (пуст, показан дефолтный)';
+        }
+    }
+}
+
+systemPromptTextarea.addEventListener('input', () => {
+    systemPromptTextarea.style.fontStyle = 'normal';
+    const label = document.getElementById('system-prompt-label');
+    if (promptContextSelect.value !== 'default' && label && label.textContent.includes('пуст')) {
+        label.textContent = 'Системный промпт (редактируется)';
+    }
+});
+
+promptContextSelect.addEventListener('change', updatePromptTextarea);
+
+saveSettingsBtn.addEventListener('click', async () => {
+    const theme = themeSelect.value;
+    const timezone = timezoneInput.value;
+    saveSettingsBtn.textContent = 'Сохранение...';
+    try {
+        await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme, timezone })
+        });
+        applyTheme(theme);
+        saveSettingsBtn.textContent = 'Сохранено ✓';
+        setTimeout(() => saveSettingsBtn.textContent = 'Сохранить настройки', 2000);
+    } catch (e) {
+        console.error("Save settings error:", e);
+        saveSettingsBtn.textContent = 'Ошибка';
+        setTimeout(() => saveSettingsBtn.textContent = 'Сохранить настройки', 2000);
+    }
+});
+
+savePromptBtn.addEventListener('click', async () => {
+    const model_id = promptContextSelect.value;
+    const prompt = systemPromptTextarea.value;
+    savePromptBtn.textContent = 'Сохранение...';
+    try {
+        await fetch('/api/memory/prompts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model_id, prompt })
+        });
+        
+        // Update local cache
+        if (model_id === 'default') {
+            currentPromptsData.default = prompt;
+        } else {
+            if (!currentPromptsData.models) currentPromptsData.models = {};
+            currentPromptsData.models[model_id] = prompt;
+        }
+        
+        savePromptBtn.textContent = 'Сохранено ✓';
+        setTimeout(() => savePromptBtn.textContent = 'Сохранить промпт', 2000);
+    } catch (e) {
+        console.error("Save prompt error:", e);
+        savePromptBtn.textContent = 'Ошибка';
+        setTimeout(() => savePromptBtn.textContent = 'Сохранить промпт', 2000);
+    }
+});
+
+const saveTemplateBtn = document.getElementById('save-template-btn');
+if (saveTemplateBtn) {
+    saveTemplateBtn.addEventListener('click', async () => {
+        const system_template = document.getElementById('system-template-textarea').value;
+        const tool_rules = document.getElementById('tool-rules-textarea').value;
+        saveTemplateBtn.textContent = 'Сохранение...';
+        try {
+            await fetch('/api/memory/prompts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ system_template, tool_rules })
+            });
+            
+            if (currentPromptsData) {
+                currentPromptsData.system_template = system_template;
+                currentPromptsData.tool_rules = tool_rules;
+            }
+            
+            saveTemplateBtn.textContent = 'Сохранено ✓';
+            setTimeout(() => saveTemplateBtn.textContent = 'Сохранить структуру', 2000);
+        } catch (e) {
+            console.error("Save template error:", e);
+            saveTemplateBtn.textContent = 'Ошибка';
+            setTimeout(() => saveTemplateBtn.textContent = 'Сохранить структуру', 2000);
+        }
+    });
+}
+
+function applyTheme(theme) {
+    if (theme === 'light') {
+        document.body.classList.add('theme-light');
+    } else if (theme === 'system') {
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+            document.body.classList.add('theme-light');
+        } else {
+            document.body.classList.remove('theme-light');
+        }
+    } else {
+        document.body.classList.remove('theme-light');
+    }
+}
+
+// Check initial theme on load
+fetch('/api/settings').then(r => r.json()).then(s => {
+    if (s && s.theme) applyTheme(s.theme);
+}).catch(e => {});
