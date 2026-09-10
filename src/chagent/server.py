@@ -67,6 +67,22 @@ async def get_index():
             return HTMLResponse(f.read())
     return HTMLResponse("<h1>Static files not found. Please create index.html in static directory.</h1>")
 
+@app.get("/api/help")
+async def get_help():
+    """Возвращает содержимое справки из data/HOW_IT_WORKS.md"""
+    try:
+        with open("data/HOW_IT_WORKS.md", "r", encoding="utf-8") as f:
+            return {"content": f.read()}
+    except Exception:
+        return {"content": "Справка не найдена."}
+
+@app.get("/api/tools")
+async def get_tools():
+    """Возвращает актуальный список инструментов агента (agent.tools)"""
+    if getattr(app.state, 'agent', None):
+        return {"tools": app.state.agent.tools}
+    return {"tools": []}
+
 class SwitchModelRequest(BaseModel):
     provider_name: str
     model_name: str

@@ -426,6 +426,8 @@ body {
 
 .modal-body {
     padding: 24px;
+    max-height: 70vh;
+    overflow-y: auto;
 }
 
 .tab-content {
@@ -481,6 +483,52 @@ body {
 
 .primary-btn:hover {
     background: var(--accent-hover);
+}
+
+/* Markdown Styles for Help Modal */
+.markdown-body {
+    line-height: 1.6;
+}
+
+.markdown-body h1, .markdown-body h2, .markdown-body h3 {
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.markdown-body p, .markdown-body ul, .markdown-body ol {
+    margin-bottom: 16px;
+}
+
+.markdown-body ul, .markdown-body ol {
+    padding-left: 2em;
+}
+
+.markdown-body code {
+    background: rgba(255,255,255,0.1);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 0.85em;
+    word-break: break-word;
+}
+
+.markdown-body pre {
+    background: rgba(0,0,0,0.3);
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin-bottom: 16px;
+    white-space: pre-wrap;       /* Обертка длинных строк */
+    word-wrap: break-word;       /* Обертка длинных строк */
+}
+
+.markdown-body pre code {
+    background: transparent;
+    padding: 0;
+    word-break: normal;
+    white-space: pre-wrap;
 }
 
 /* Light Theme Variables */

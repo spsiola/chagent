@@ -9,6 +9,7 @@ from .skill_loader import load_skills
 from .mcp_loader import load_mcp_configs
 from .memory_manager import MemoryManager
 from .settings import load_settings
+from .native_tools import register_native_tools
 import uvicorn
 from .server import app
 
@@ -43,6 +44,11 @@ async def initialize_system(log_callback=_default_logger):
         if not os.path.exists(data_mcp) and os.path.exists(init_mcp):
             shutil.copy2(init_mcp, data_mcp)
             
+        init_help = "init_memory/HOW_IT_WORKS.md"
+        data_help = "data/HOW_IT_WORKS.md"
+        if not os.path.exists(data_help) and os.path.exists(init_help):
+            shutil.copy2(init_help, data_help)
+            
         init_skills_dir = "init_memory/skills"
         data_skills_dir = "data/skills"
         if os.path.exists(init_skills_dir) and not os.listdir(data_skills_dir):
@@ -68,6 +74,9 @@ async def initialize_system(log_callback=_default_logger):
             provider_name=provider_name,
             prompt_builder_func=prompt_builder
         )
+        
+        # Регистрируем нативные инструменты для работы с ФС и ОС
+        register_native_tools(agent)
         
         # Register a standard skill
         agent.register_tool(

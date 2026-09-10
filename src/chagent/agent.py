@@ -122,18 +122,27 @@ class AsyncAgent:
                 except json.JSONDecodeError:
                     args = tool_call.function.arguments
                     
+                    # Fix the history to avoid 400 error on next API call
+                    if "tool_calls" in msg_dict:
+                        for tc in msg_dict["tool_calls"]:
+                            if tc.get("id") == getattr(tool_call, "id", None):
+                                tc["function"]["arguments"] = "{}"
+                    
                 yield {"type": "tool_call", "name": func_name, "args": args}
                 
                 if func_name in self.tool_funcs:
-                    try:
-                        func = self.tool_funcs[func_name]
-                        import asyncio
-                        if asyncio.iscoroutinefunction(func):
-                            result = await func(**args) if isinstance(args, dict) else await func()
-                        else:
-                            result = func(**args) if isinstance(args, dict) else func()
-                    except Exception as e:
-                        result = f"Error: {e}"
+                    if not isinstance(args, dict):
+                        result = "Error: Invalid JSON syntax in tool arguments. You must provide a valid JSON object."
+                    else:
+                        try:
+                            func = self.tool_funcs[func_name]
+                            import asyncio
+                            if asyncio.iscoroutinefunction(func):
+                                result = await func(**args)
+                            else:
+                                result = func(**args)
+                        except Exception as e:
+                            result = f"Error: {e}"
                 else:
                     result = f"Unknown tool: {func_name}"
                     

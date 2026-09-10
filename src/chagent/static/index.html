@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chagent AI</title>
     <link rel="stylesheet" href="/static/styles.css?v=2">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -61,7 +62,9 @@
             </div>
             <div class="modal-tabs">
                 <button class="tab-btn active" data-tab="tab-prompts">Память и Промпты</button>
-                <button class="tab-btn" data-tab="tab-template">Структура контекста</button>
+                <button class="tab-btn" data-tab="tab-structure">Структура контекста</button>
+                <button class="tab-btn" data-tab="tab-tools">Инструменты</button>
+                <button class="tab-btn" data-tab="tab-help">Справка</button>
                 <button class="tab-btn" data-tab="tab-app">Интерфейс</button>
             </div>
             
@@ -82,7 +85,7 @@
                 </div>
                 
                 <!-- Template Tab -->
-                <div id="tab-template" class="tab-content">
+                <div id="tab-structure" class="tab-content">
                     <div class="form-group">
                         <label for="system-template-textarea">Шаблон системы</label>
                         <textarea id="system-template-textarea" class="form-control" rows="5" style="font-family: monospace;"></textarea>
@@ -91,7 +94,21 @@
                         <label for="tool-rules-textarea">Правила инструментов</label>
                         <textarea id="tool-rules-textarea" class="form-control" rows="4"></textarea>
                     </div>
-                    <button id="save-template-btn" class="primary-btn">Сохранить структуру</button>
+                    <button id="save-template-btn" class="save-btn">Сохранить структуру контекста</button>
+                </div>
+
+                <!-- Help Tab -->
+                <div id="tab-help" class="tab-content">
+                    <div id="help-markdown-container" class="markdown-body">
+                        <!-- Сюда отрендерится md-файл справки -->
+                    </div>
+                </div>
+
+                <!-- Tools Tab -->
+                <div id="tab-tools" class="tab-content">
+                    <div id="tools-markdown-container" class="markdown-body">
+                        <!-- Сюда отрендерится список инструментов -->
+                    </div>
                 </div>
                 
                 <!-- App Settings Tab -->

@@ -321,6 +321,50 @@ tabBtns.forEach(btn => {
     });
 });
 
+// Help tab logic
+const helpTabBtn = document.querySelector('[data-tab="tab-help"]');
+const helpMarkdownContainer = document.getElementById('help-markdown-container');
+
+if (helpTabBtn) {
+    helpTabBtn.addEventListener('click', async () => {
+        try {
+            helpMarkdownContainer.innerHTML = '<p>Загрузка...</p>';
+            const res = await fetch('/api/help');
+            const data = await res.json();
+            helpMarkdownContainer.innerHTML = marked.parse(data.content);
+        } catch (e) {
+            console.error("Error loading help:", e);
+            helpMarkdownContainer.innerHTML = '<p style="color:#ef4444;">Ошибка загрузки справки</p>';
+        }
+    });
+}
+
+// Tools tab logic
+const toolsTabBtn = document.querySelector('[data-tab="tab-tools"]');
+const toolsMarkdownContainer = document.getElementById('tools-markdown-container');
+
+if (toolsTabBtn) {
+    toolsTabBtn.addEventListener('click', async () => {
+        try {
+            toolsMarkdownContainer.innerHTML = '<p>Загрузка...</p>';
+            const res = await fetch('/api/tools');
+            const data = await res.json();
+            
+            if (!data.tools || data.tools.length === 0) {
+                toolsMarkdownContainer.innerHTML = '<p>Инструменты не загружены (возможно агент еще инициализируется).</p>';
+                return;
+            }
+            
+            const toolsJson = JSON.stringify(data.tools, null, 2);
+            const markdown = `**Текущий массив \`agent.tools\`:**\n\n\`\`\`json\n${toolsJson}\n\`\`\``;
+            toolsMarkdownContainer.innerHTML = marked.parse(markdown);
+        } catch (e) {
+            console.error("Error loading tools:", e);
+            toolsMarkdownContainer.innerHTML = '<p style="color:#ef4444;">Ошибка загрузки списка инструментов</p>';
+        }
+    });
+}
+
 async function loadSettingsAndPrompts() {
     try {
         // Load App Settings
