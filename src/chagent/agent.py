@@ -2,11 +2,15 @@ import json
 from typing import List, Dict, Any, Callable
 from openai import AsyncOpenAI
 
+import time
+
 class AsyncAgent:
-    def __init__(self, client: AsyncOpenAI, model: str, system_prompt: str = "You are a helpful AI assistant. You can use tools to answer user questions.", provider_name: str = "unknown", prompt_builder_func: Callable = None):
+    def __init__(self, client: AsyncOpenAI, model: str, system_prompt: str = "You are a helpful AI assistant. You can use tools to answer user questions.", provider_name: str = "unknown", prompt_builder_func: Callable = None, session_id: str = "default", stats_manager = None):
         self.client = client
         self.model = model
         self.provider_name = provider_name
+        self.session_id = session_id
+        self.stats_manager = stats_manager
         self.tools: List[Dict[str, Any]] = []
         self.tool_funcs: Dict[str, Callable] = {}
         self.base_system_prompt = system_prompt
@@ -46,11 +50,35 @@ class AsyncAgent:
             
             yield {"type": "info", "content": "Agent Thinking..."}
             
+            start_time = time.time()
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=self.history,
                 tools=self.tools if self.tools else None,
             )
+            duration_ms = int((time.time() - start_time) * 1000)
+            
+            # Record stats
+            if self.stats_manager:
+                prompt_tokens = response.usage.prompt_tokens if getattr(response, "usage", None) else 0
+                completion_tokens = response.usage.completion_tokens if getattr(response, "usage", None) else 0
+                total_tokens = response.usage.total_tokens if getattr(response, "usage", None) else 0
+                # Ollama/OpenAI might have different ways to report cached tokens.
+                # Assuming `cache_hit` if prompt_tokens is exceptionally low for the history, or if API explicitly reports it.
+                cache_hit = False
+                if getattr(response.usage, 'prompt_tokens_details', None) and getattr(response.usage.prompt_tokens_details, 'cached_tokens', 0) > 0:
+                    cache_hit = True
+                
+                self.stats_manager.record_stat(
+                    session_id=self.session_id,
+                    provider=getattr(self, "provider_name", "unknown"),
+                    model=self.model,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                    duration_ms=duration_ms,
+                    cache_hit=cache_hit
+                )
             
             msg = response.choices[0].message
             

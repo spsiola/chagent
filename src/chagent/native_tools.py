@@ -1,5 +1,7 @@
 import os
 import subprocess
+import json
+from .stats_manager import StatsManager
 
 def _validate_path(target_path: str, settings) -> str | None:
     """Validates if a path is safe to access. Returns error string if invalid, None if valid."""
@@ -78,6 +80,12 @@ def run_command(command: str, settings=None) -> str:
     except Exception as e:
         return f"Error running command: {e}"
 
+def query_llm_stats(query: str) -> str:
+    """Executes a read-only SELECT query against the local SQLite database containing LLM usage statistics."""
+    sm = StatsManager()
+    result = sm.execute_query(query)
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
 def register_native_tools(agent, settings):
     """Registers standard native tools with the agent, enforcing security settings."""
     agent.register_tool(
@@ -126,3 +134,15 @@ def register_native_tools(agent, settings):
         },
         func=lambda command: run_command(command, settings)
     )
+
+    agent.register_tool(
+        name="query_llm_stats",
+        description="Executes a read-only SELECT query against the local SQLite database containing LLM usage statistics (table: llm_stats with columns: id, session_id, timestamp, provider, model, prompt_tokens, completion_tokens, total_tokens, duration_ms, cache_hit).",
+        parameters={
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"]
+        },
+        func=lambda query: query_llm_stats(query)
+    )
+

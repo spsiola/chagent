@@ -72,7 +72,9 @@ async def initialize_system(log_callback=_default_logger):
             model, 
             system_prompt=prompt,
             provider_name=provider_name,
-            prompt_builder_func=prompt_builder
+            prompt_builder_func=prompt_builder,
+            session_id=getattr(app.state, 'session_id', "default"),
+            stats_manager=getattr(app.state, 'stats_manager', None)
         )
         
         # Регистрируем нативные инструменты для работы с ФС и ОС

@@ -10,6 +10,8 @@ from openai import AsyncOpenAI
 from .config import load_config
 from .llm_tester import test_model
 from .settings import AppSettings, save_settings
+import uuid
+from .stats_manager import StatsManager
 
 from contextlib import asynccontextmanager
 
@@ -38,9 +40,19 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
-        # Send past harness logs to newly connected clients
+        
+        # Очищаем клиентский чат при (пере)подключении
+        await websocket.send_json({"type": "clear"})
+        
+        # Сначала отправляем логи инициализации и harness
         for log in self.harness_logs:
             await websocket.send_json({"type": "harness_log", "content": log})
+            
+        # Затем историю самого диалога (чтобы она была под логами инициализации)
+        agent = getattr(app.state, 'agent', None)
+        if agent and getattr(agent, 'history', None):
+            history_data = agent.history[1:] # Skip system prompt
+            await websocket.send_json({"type": "history", "history": history_data})
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
@@ -58,6 +70,8 @@ manager = ConnectionManager()
 app.state.manager = manager
 app.state.agent_ready = asyncio.Event()
 app.state.agent = None
+app.state.session_id = str(uuid.uuid4())
+app.state.stats_manager = StatsManager()
 
 @app.get("/")
 async def get_index():
@@ -82,6 +96,16 @@ async def get_tools():
     if getattr(app.state, 'agent', None):
         return {"tools": app.state.agent.tools}
     return {"tools": []}
+
+@app.get("/api/stats")
+async def get_stats():
+    """Возвращает статистику использования LLM для текущей сессии"""
+    if hasattr(app.state, 'stats_manager') and hasattr(app.state, 'session_id'):
+        stats = app.state.stats_manager.get_session_stats(app.state.session_id)
+        # Также можем вернуть общую статистику (опционально)
+        total_stats = app.state.stats_manager.get_all_stats()
+        return {"session_stats": stats, "total_stats": total_stats}
+    return {"session_stats": [], "total_stats": []}
 
 class SwitchModelRequest(BaseModel):
     provider_name: str

@@ -68,15 +68,17 @@
                 <h2>Настройки</h2>
                 <button id="close-settings-btn" class="close-btn">&times;</button>
             </div>
-            <div class="modal-tabs">
-                <button class="tab-btn active" data-tab="tab-prompts">Память и Промпты</button>
-                <button class="tab-btn" data-tab="tab-structure">Структура контекста</button>
-                <button class="tab-btn" data-tab="tab-tools">Инструменты</button>
-                <button class="tab-btn" data-tab="tab-help">Справка</button>
-                <button class="tab-btn" data-tab="tab-app">Интерфейс</button>
-            </div>
-            
-            <div class="modal-body">
+            <div class="modal-main">
+                <div class="modal-tabs">
+                    <button class="tab-btn active" data-tab="tab-prompts">Память и Промпты</button>
+                    <button class="tab-btn" data-tab="tab-structure">Структура контекста</button>
+                    <button class="tab-btn" data-tab="tab-tools">Инструменты</button>
+                    <button class="tab-btn" data-tab="tab-help">Справка</button>
+                    <button class="tab-btn" data-tab="tab-stats">Статистика</button>
+                    <button class="tab-btn" data-tab="tab-app">Интерфейс</button>
+                </div>
+                
+                <div class="modal-body">
                 <!-- Prompts Tab -->
                 <div id="tab-prompts" class="tab-content active">
                     <div class="form-group">
@@ -134,6 +136,35 @@
                         <input type="text" id="timezone-input" class="form-control" value="UTC">
                     </div>
                     <button id="save-settings-btn" class="primary-btn">Сохранить настройки</button>
+                </div>
+
+                <!-- Stats Tab -->
+                <div id="tab-stats" class="tab-content">
+                    <div class="stats-header">
+                        <h3>Статистика за текущую сессию</h3>
+                        <button id="refresh-stats-btn" class="secondary-btn" title="Обновить статистику">
+                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        </button>
+                    </div>
+                    <div class="stats-summary" id="stats-summary-container">
+                        <!-- Сводка отрендерится тут -->
+                    </div>
+                    <div class="table-container">
+                        <table class="stats-table">
+                            <thead>
+                                <tr>
+                                    <th>Время</th>
+                                    <th>Модель</th>
+                                    <th>Токены (in/out)</th>
+                                    <th>Задержка (мс)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stats-table-body">
+                                <tr><td colspan="4" style="text-align: center;">Нет данных</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
                 </div>
             </div>
         </div>

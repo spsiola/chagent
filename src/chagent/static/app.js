@@ -157,6 +157,77 @@ function removeInfoElement() {
 }
 
 function handleAgentEvent(event) {
+    if (event.type === 'clear') {
+        chatContainer.innerHTML = '';
+        currentInfoElement = null;
+        return;
+    }
+
+    if (event.type === 'history') {
+        if (!event.history || event.history.length === 0) return;
+        
+        const welcomeMsg = document.querySelector('.welcome-message');
+        if (welcomeMsg) welcomeMsg.remove();
+        
+        event.history.forEach(msg => {
+            if (msg.role === 'user') {
+                const msgEl = document.createElement('div');
+                msgEl.className = 'message user';
+                msgEl.innerHTML = `<div class="message-bubble">${msg.content}</div>`;
+                chatContainer.appendChild(msgEl);
+            } else if (msg.role === 'assistant') {
+                if (msg.content) {
+                    const msgEl = document.createElement('div');
+                    msgEl.className = 'message ai';
+                    const bubble = document.createElement('div');
+                    bubble.className = 'message-bubble';
+                    let formatted = msg.content.replace(/\n/g, '<br>');
+                    formatted = formatted.replace(/```([\s\S]*?)```/g, '<pre style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:8px;"><code>$1</code></pre>');
+                    bubble.innerHTML = formatted;
+                    msgEl.appendChild(bubble);
+                    chatContainer.appendChild(msgEl);
+                }
+                if (msg.tool_calls) {
+                    msg.tool_calls.forEach(tc => {
+                        const toolEl = document.createElement('div');
+                        toolEl.className = 'tool-event';
+                        let argsStr = typeof tc.function.arguments === 'string' ? tc.function.arguments : JSON.stringify(tc.function.arguments, null, 2);
+                        try {
+                            const parsed = JSON.parse(argsStr);
+                            argsStr = JSON.stringify(parsed, null, 2);
+                        } catch(e) {}
+                        
+                        toolEl.innerHTML = `
+                            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                            <div style="flex:1; overflow-x: hidden; width: 100%;">
+                                Вызов инструмента: <strong>${tc.function.name}</strong>
+                                <pre>${argsStr}</pre>
+                            </div>
+                        `;
+                        chatContainer.appendChild(toolEl);
+                    });
+                }
+            } else if (msg.role === 'tool') {
+                const resEl = document.createElement('div');
+                resEl.className = 'tool-event tool-result';
+                resEl.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+                resEl.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                resEl.style.color = '#10b981';
+                
+                resEl.innerHTML = `
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="flex-shrink:0"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                    <div style="flex:1; overflow-x: hidden; width: 100%;">
+                        Результат инструмента:
+                        <pre>${msg.content}</pre>
+                    </div>
+                `;
+                chatContainer.appendChild(resEl);
+            }
+        });
+        scrollToBottom();
+        return;
+    }
+
     if (event.type === 'metrics') {
         const metricsEl = document.getElementById('metrics-status');
         const metricsText = document.getElementById('metrics-text');
@@ -207,7 +278,7 @@ function handleAgentEvent(event) {
         
         toolEl.innerHTML = `
             <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            <div style="flex:1">
+            <div style="flex:1; overflow-x: hidden; width: 100%;">
                 Вызов инструмента: <strong>${event.name}</strong>
                 <pre>${argsStr}</pre>
             </div>
@@ -373,6 +444,81 @@ if (toolsTabBtn) {
             toolsMarkdownContainer.innerHTML = '<p style="color:#ef4444;">Ошибка загрузки списка инструментов</p>';
         }
     });
+}
+
+// Stats tab logic
+const statsTabBtn = document.querySelector('[data-tab="tab-stats"]');
+const refreshStatsBtn = document.getElementById('refresh-stats-btn');
+const statsSummaryContainer = document.getElementById('stats-summary-container');
+const statsTableBody = document.getElementById('stats-table-body');
+
+async function loadStats() {
+    try {
+        if (statsTableBody) statsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Загрузка...</td></tr>';
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+        
+        const sessionStats = data.session_stats || [];
+        
+        if (sessionStats.length === 0) {
+            if (statsTableBody) statsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Нет данных за текущую сессию</td></tr>';
+            if (statsSummaryContainer) statsSummaryContainer.innerHTML = '';
+            return;
+        }
+        
+        let totalPrompt = 0;
+        let totalCompletion = 0;
+        let totalTokens = 0;
+        
+        if (statsTableBody) statsTableBody.innerHTML = '';
+        sessionStats.forEach(stat => {
+            totalPrompt += stat.prompt_tokens || 0;
+            totalCompletion += stat.completion_tokens || 0;
+            totalTokens += stat.total_tokens || 0;
+            
+            const tr = document.createElement('tr');
+            // Assuming timestamp is returned in UTC ISO string by sqlite if not formatted, 
+            // but standard sqlite returns strings like '2023-10-12 15:30:00'
+            const dt = stat.timestamp.includes('Z') ? new Date(stat.timestamp) : new Date(stat.timestamp + 'Z');
+            const timeStr = dt.toLocaleTimeString();
+            
+            tr.innerHTML = `
+                <td>${timeStr}</td>
+                <td>${stat.provider} / ${stat.model}</td>
+                <td><span style="color: #94a3b8;">${stat.prompt_tokens}</span> / <span style="color: #10b981;">${stat.completion_tokens}</span></td>
+                <td>${stat.duration_ms}</td>
+            `;
+            if (statsTableBody) statsTableBody.appendChild(tr);
+        });
+        
+        if (statsSummaryContainer) {
+            statsSummaryContainer.innerHTML = `
+                <div class="stat-box">
+                    <div class="stat-value">${sessionStats.length}</div>
+                    <div class="stat-label">Запросов</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">${totalTokens}</div>
+                    <div class="stat-label">Всего токенов</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" style="color: #10b981;">${totalCompletion}</div>
+                    <div class="stat-label">Сгенерировано</div>
+                </div>
+            `;
+        }
+    } catch (e) {
+        console.error("Error loading stats:", e);
+        if (statsTableBody) statsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #ef4444;">Ошибка загрузки</td></tr>';
+    }
+}
+
+if (statsTabBtn) {
+    statsTabBtn.addEventListener('click', loadStats);
+}
+
+if (refreshStatsBtn) {
+    refreshStatsBtn.addEventListener('click', loadStats);
 }
 
 async function loadSettingsAndPrompts() {
