@@ -199,17 +199,18 @@ function handleAgentEvent(event) {
                             argsStr = JSON.stringify(parsed, null, 2);
                         } catch(e) {}
                         
+                        const estTokens = Math.ceil(argsStr.length / 4);
                         toolEl.innerHTML = `
                             <div class="tool-event-header">
                                 <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                                <span>Вызов инструмента: <strong>${tc.function.name}</strong></span>
+                                <span>Вызов инструмента: <strong>${tc.function.name}</strong> (~${estTokens} токенов)</span>
                                 <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
                             </div>
                             <div class="tool-event-content">
                                 <pre>${argsStr}</pre>
                             </div>
                         `;
-                        toolEl.addEventListener('click', () => toolEl.classList.toggle('expanded'));
+                        toolEl.querySelector('.tool-event-header').addEventListener('click', () => toolEl.classList.toggle('expanded'));
                         chatContainer.appendChild(toolEl);
                     });
                 }
@@ -220,17 +221,18 @@ function handleAgentEvent(event) {
                 resEl.style.borderColor = 'rgba(16, 185, 129, 0.3)';
                 resEl.style.color = '#10b981';
                 
+                const estTokens = msg.content ? Math.ceil(msg.content.length / 4) : 0;
                 resEl.innerHTML = `
                     <div class="tool-event-header">
                         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="flex-shrink:0"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
-                        <span>Результат инструмента</span>
+                        <span>Ответ инструмента${msg.name ? `: <strong>${msg.name}</strong>` : ''} (~${estTokens} токенов)</span>
                         <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     </div>
                     <div class="tool-event-content">
                         <pre>${msg.content}</pre>
                     </div>
                 `;
-                resEl.addEventListener('click', () => resEl.classList.toggle('expanded'));
+                resEl.querySelector('.tool-event-header').addEventListener('click', () => resEl.classList.toggle('expanded'));
                 chatContainer.appendChild(resEl);
             }
         });
@@ -286,17 +288,18 @@ function handleAgentEvent(event) {
         let argsStr = '';
         try { argsStr = JSON.stringify(event.args, null, 2); } catch(e) { argsStr = event.args; }
         
+        const estTokens = Math.ceil(argsStr.length / 4);
         toolEl.innerHTML = `
             <div class="tool-event-header">
                 <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                <span>Вызов инструмента: <strong>${event.name}</strong></span>
+                <span>Вызов инструмента: <strong>${event.name}</strong> (~${estTokens} токенов)</span>
                 <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
             <div class="tool-event-content">
                 <pre>${argsStr}</pre>
             </div>
         `;
-        toolEl.addEventListener('click', () => toolEl.classList.toggle('expanded'));
+        toolEl.querySelector('.tool-event-header').addEventListener('click', () => toolEl.classList.toggle('expanded'));
         chatContainer.appendChild(toolEl);
         scrollToBottom();
     }
@@ -308,17 +311,18 @@ function handleAgentEvent(event) {
         resEl.style.borderColor = 'rgba(16, 185, 129, 0.3)';
         resEl.style.color = '#10b981';
         
+        const estTokens = event.content ? Math.ceil(event.content.length / 4) : 0;
         resEl.innerHTML = `
             <div class="tool-event-header">
                 <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="flex-shrink:0"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
-                <span>Результат инструмента</span>
+                <span>Ответ инструмента${event.name ? `: <strong>${event.name}</strong>` : ''} (~${estTokens} токенов)</span>
                 <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
             <div class="tool-event-content">
                 <pre>${event.content}</pre>
             </div>
         `;
-        resEl.addEventListener('click', () => resEl.classList.toggle('expanded'));
+        resEl.querySelector('.tool-event-header').addEventListener('click', () => resEl.classList.toggle('expanded'));
         chatContainer.appendChild(resEl);
         scrollToBottom();
     }
