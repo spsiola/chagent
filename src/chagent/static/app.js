@@ -441,6 +441,38 @@ if (helpTabBtn) {
 // Tools tab logic
 const toolsTabBtn = document.querySelector('[data-tab="tab-tools"]');
 const toolsMarkdownContainer = document.getElementById('tools-markdown-container');
+const toolsViewToggle = document.getElementById('tools-view-toggle');
+let currentToolsData = null;
+
+function renderTools() {
+    if (!currentToolsData || currentToolsData.length === 0) {
+        toolsMarkdownContainer.innerHTML = '<p>Инструменты не загружены (возможно агент еще инициализируется).</p>';
+        return;
+    }
+
+    if (toolsViewToggle && toolsViewToggle.checked) {
+        // Формальный JSON
+        const toolsJson = JSON.stringify(currentToolsData, null, 2);
+        const markdown = `**Текущий массив \`agent.tools\`:**\n\n\`\`\`json\n${toolsJson}\n\`\`\``;
+        toolsMarkdownContainer.innerHTML = marked.parse(markdown);
+    } else {
+        // Удобный для человека вид
+        let markdown = `**Доступные инструменты (${currentToolsData.length}):**\n\n`;
+        currentToolsData.forEach(tool => {
+            if (tool.type === 'function' && tool.function) {
+                markdown += `### 🛠 \`${tool.function.name}\`\n`;
+                markdown += `**Описание:** ${tool.function.description || 'Нет описания'}\n\n---\n`;
+            } else {
+                markdown += `### 🛠 \`Неизвестный тип\`\n\n`;
+            }
+        });
+        toolsMarkdownContainer.innerHTML = marked.parse(markdown);
+    }
+}
+
+if (toolsViewToggle) {
+    toolsViewToggle.addEventListener('change', renderTools);
+}
 
 if (toolsTabBtn) {
     toolsTabBtn.addEventListener('click', async () => {
@@ -448,15 +480,8 @@ if (toolsTabBtn) {
             toolsMarkdownContainer.innerHTML = '<p>Загрузка...</p>';
             const res = await fetch('/api/tools');
             const data = await res.json();
-            
-            if (!data.tools || data.tools.length === 0) {
-                toolsMarkdownContainer.innerHTML = '<p>Инструменты не загружены (возможно агент еще инициализируется).</p>';
-                return;
-            }
-            
-            const toolsJson = JSON.stringify(data.tools, null, 2);
-            const markdown = `**Текущий массив \`agent.tools\`:**\n\n\`\`\`json\n${toolsJson}\n\`\`\``;
-            toolsMarkdownContainer.innerHTML = marked.parse(markdown);
+            currentToolsData = data.tools;
+            renderTools();
         } catch (e) {
             console.error("Error loading tools:", e);
             toolsMarkdownContainer.innerHTML = '<p style="color:#ef4444;">Ошибка загрузки списка инструментов</p>';
