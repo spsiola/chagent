@@ -12,9 +12,6 @@ function connectWebSocket() {
     ws = new WebSocket(`${protocol}//${window.location.host}/ws/chat`);
 
     ws.onopen = () => {
-        statusDiv.classList.remove('testing');
-        statusDiv.classList.add('connected');
-        statusDiv.title = 'Connected';
         fetchModels();
     };
 
@@ -47,6 +44,14 @@ async function fetchModels() {
                 modelSelect.appendChild(opt);
             });
             modelSelect.style.display = 'inline-block';
+            
+            if (data.current_model) {
+                statusDiv.classList.remove('testing', 'error');
+                statusDiv.classList.add('connected');
+                statusDiv.title = 'Connected';
+                document.getElementById('send-button').disabled = false;
+                document.getElementById('send-button').style.opacity = '1';
+            }
         }
     } catch (e) {
         console.error("Failed to fetch models", e);
@@ -362,7 +367,19 @@ function handleAgentEvent(event) {
     else if (event.type === 'finish') {
         removeInfoElement();
         const bubble = document.getElementById('active-ai-bubble');
-        if (bubble) bubble.removeAttribute('id');
+        if (bubble) {
+            if (event.final_content !== undefined) {
+                if (event.final_content.trim() === '') {
+                    const msgEl = bubble.closest('.message');
+                    if (msgEl) msgEl.remove();
+                } else {
+                    let formatted = event.final_content.replace(/\n/g, '<br>');
+                    formatted = formatted.replace(/```([\s\S]*?)```/g, '<pre style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:8px;"><code>$1</code></pre>');
+                    bubble.innerHTML = formatted;
+                }
+            }
+            bubble.removeAttribute('id');
+        }
     }
     else if (event.type === 'harness_log') {
         let container = chatContainer.lastElementChild;

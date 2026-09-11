@@ -174,6 +174,7 @@ body {
     flex-direction: column;
     max-width: 80%;
     animation: fadeIn 0.3s ease-out;
+    flex-shrink: 0;
 }
 
 @keyframes fadeIn {
@@ -222,6 +223,7 @@ body {
     flex-direction: column;
     animation: fadeIn 0.3s ease-out;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
 .tool-event:hover {
