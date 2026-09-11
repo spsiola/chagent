@@ -222,6 +222,12 @@ function handleAgentEvent(event) {
                 resEl.style.color = '#10b981';
                 
                 const estTokens = msg.content ? Math.ceil(msg.content.length / 4) : 0;
+                let formattedContent = msg.content;
+                try {
+                    const parsed = JSON.parse(msg.content);
+                    formattedContent = JSON.stringify(parsed, null, 2);
+                } catch(e) {}
+                
                 resEl.innerHTML = `
                     <div class="tool-event-header">
                         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="flex-shrink:0"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
@@ -229,7 +235,7 @@ function handleAgentEvent(event) {
                         <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     </div>
                     <div class="tool-event-content">
-                        <pre>${msg.content}</pre>
+                        <pre>${formattedContent}</pre>
                     </div>
                 `;
                 resEl.querySelector('.tool-event-header').addEventListener('click', () => resEl.classList.toggle('expanded'));
@@ -312,6 +318,12 @@ function handleAgentEvent(event) {
         resEl.style.color = '#10b981';
         
         const estTokens = event.content ? Math.ceil(event.content.length / 4) : 0;
+        let formattedContent = event.content;
+        try {
+            const parsed = JSON.parse(event.content);
+            formattedContent = JSON.stringify(parsed, null, 2);
+        } catch(e) {}
+        
         resEl.innerHTML = `
             <div class="tool-event-header">
                 <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="flex-shrink:0"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
@@ -319,7 +331,7 @@ function handleAgentEvent(event) {
                 <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
             <div class="tool-event-content">
-                <pre>${event.content}</pre>
+                <pre>${formattedContent}</pre>
             </div>
         `;
         resEl.querySelector('.tool-event-header').addEventListener('click', () => resEl.classList.toggle('expanded'));
