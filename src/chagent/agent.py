@@ -51,24 +51,81 @@ class AsyncAgent:
             yield {"type": "info", "content": "Agent Thinking..."}
             
             start_time = time.time()
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=self.history,
-                tools=self.tools if self.tools else None,
-            )
+            
+            stream_options = {"include_usage": True} if self.stats_manager else None
+            try:
+                stream = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=self.history,
+                    tools=self.tools if self.tools else None,
+                    stream=True,
+                    stream_options=stream_options,
+                )
+            except Exception as e:
+                # If stream_options is not supported by this provider (e.g., some OpenAI compatible endpoints)
+                stream = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=self.history,
+                    tools=self.tools if self.tools else None,
+                    stream=True,
+                )
+                
+            current_content = ""
+            current_tool_calls = {}
+            first_content_chunk = True
+            
+            prompt_tokens = 0
+            completion_tokens = 0
+            total_tokens = 0
+            cache_hit = False
+
+            async for chunk in stream:
+                if chunk.choices:
+                    delta = chunk.choices[0].delta
+                    
+                    if delta.content:
+                        if first_content_chunk:
+                            yield {
+                                "type": "message_start", 
+                                "model": self.model, 
+                                "provider": getattr(self, "provider_name", "unknown")
+                            }
+                            first_content_chunk = False
+                            
+                        current_content += delta.content
+                        yield {"type": "message_chunk", "content": delta.content}
+                        
+                    if delta.tool_calls:
+                        for tc_chunk in delta.tool_calls:
+                            idx = tc_chunk.index
+                            if idx not in current_tool_calls:
+                                current_tool_calls[idx] = {
+                                    "id": tc_chunk.id or f"call_{idx}_{int(time.time())}",
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc_chunk.function.name or "",
+                                        "arguments": ""
+                                    }
+                                }
+                            else:
+                                if tc_chunk.function.name:
+                                    current_tool_calls[idx]["function"]["name"] += tc_chunk.function.name
+                                    
+                            if tc_chunk.function.arguments:
+                                current_tool_calls[idx]["function"]["arguments"] += tc_chunk.function.arguments
+
+                # Process usage if provided in chunk (usually last chunk for OpenAI)
+                if getattr(chunk, "usage", None):
+                    prompt_tokens = chunk.usage.prompt_tokens or 0
+                    completion_tokens = chunk.usage.completion_tokens or 0
+                    total_tokens = chunk.usage.total_tokens or 0
+                    
+                    if getattr(chunk.usage, 'prompt_tokens_details', None) and getattr(chunk.usage.prompt_tokens_details, 'cached_tokens', 0) > 0:
+                        cache_hit = True
+
             duration_ms = int((time.time() - start_time) * 1000)
             
-            # Record stats
             if self.stats_manager:
-                prompt_tokens = response.usage.prompt_tokens if getattr(response, "usage", None) else 0
-                completion_tokens = response.usage.completion_tokens if getattr(response, "usage", None) else 0
-                total_tokens = response.usage.total_tokens if getattr(response, "usage", None) else 0
-                # Ollama/OpenAI might have different ways to report cached tokens.
-                # Assuming `cache_hit` if prompt_tokens is exceptionally low for the history, or if API explicitly reports it.
-                cache_hit = False
-                if getattr(response.usage, 'prompt_tokens_details', None) and getattr(response.usage.prompt_tokens_details, 'cached_tokens', 0) > 0:
-                    cache_hit = True
-                
                 self.stats_manager.record_stat(
                     session_id=self.session_id,
                     provider=getattr(self, "provider_name", "unknown"),
@@ -80,16 +137,28 @@ class AsyncAgent:
                     cache_hit=cache_hit
                 )
             
-            msg = response.choices[0].message
-            
-            tool_calls = msg.tool_calls
+            tool_calls = []
+            if current_tool_calls:
+                for idx in sorted(current_tool_calls.keys()):
+                    class MockToolCall:
+                        def __init__(self, id, name, arguments):
+                            self.id = id
+                            class Function:
+                                def __init__(self, n, a):
+                                    self.name = n
+                                    self.arguments = a
+                            self.function = Function(name, arguments)
+                    
+                    tc_dict = current_tool_calls[idx]
+                    tool_calls.append(MockToolCall(id=tc_dict["id"], name=tc_dict["function"]["name"], arguments=tc_dict["function"]["arguments"]))
+                    
             is_fallback = False
             
             # Fallback for local models that output tool calls as JSON in content
-            if not tool_calls and msg.content:
+            if not tool_calls and current_content:
                 fallback_calls = []
                 decoder = json.JSONDecoder()
-                s = msg.content
+                s = current_content
                 pos = 0
                 while pos < len(s):
                     pos = s.find('{', pos)
@@ -121,19 +190,14 @@ class AsyncAgent:
                     
                     is_fallback = True
 
-            if msg.content and not is_fallback:
-                yield {
-                    "type": "message", 
-                    "role": "assistant", 
-                    "content": msg.content,
-                    "model": self.model,
-                    "provider": getattr(self, "provider_name", "unknown")
-                }
-
             # Convert msg to dict for appending to messages
-            msg_dict = msg.model_dump(exclude_none=True)
-            if is_fallback:
-                # Synthesize tool_calls for the context history so the LLM doesn't get confused
+            msg_dict = {"role": "assistant"}
+            if current_content and not is_fallback:
+                msg_dict["content"] = current_content
+            else:
+                msg_dict["content"] = None
+                
+            if tool_calls:
                 msg_dict["tool_calls"] = [
                     {
                         "id": tc.id,
@@ -145,7 +209,6 @@ class AsyncAgent:
                     }
                     for tc in tool_calls
                 ]
-                msg_dict["content"] = None
                 
             self.history.append(msg_dict)
             

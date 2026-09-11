@@ -276,15 +276,40 @@ function handleAgentEvent(event) {
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
         
-        // Basic markdown-like handling (newlines to br)
         let formatted = event.content.replace(/\n/g, '<br>');
-        // Code block formatting
         formatted = formatted.replace(/```([\s\S]*?)```/g, '<pre style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:8px;"><code>$1</code></pre>');
         
         bubble.innerHTML = formatted;
         msgEl.appendChild(bubble);
         chatContainer.appendChild(msgEl);
         scrollToBottom();
+    }
+    else if (event.type === 'message_start') {
+        removeInfoElement();
+        const msgEl = document.createElement('div');
+        msgEl.className = 'message ai';
+        if (event.model && event.provider) {
+            msgEl.dataset.model = `${event.provider}/${event.model}`;
+        }
+        
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        bubble.id = 'active-ai-bubble';
+        
+        msgEl.appendChild(bubble);
+        chatContainer.appendChild(msgEl);
+        window.activeAiContent = "";
+        scrollToBottom();
+    }
+    else if (event.type === 'message_chunk') {
+        window.activeAiContent += event.content;
+        const bubble = document.getElementById('active-ai-bubble');
+        if (bubble) {
+            let formatted = window.activeAiContent.replace(/\n/g, '<br>');
+            formatted = formatted.replace(/```([\s\S]*?)```/g, '<pre style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-top:8px;"><code>$1</code></pre>');
+            bubble.innerHTML = formatted;
+            scrollToBottom();
+        }
     }
     else if (event.type === 'tool_call') {
         removeInfoElement();
@@ -340,6 +365,8 @@ function handleAgentEvent(event) {
     }
     else if (event.type === 'finish') {
         removeInfoElement();
+        const bubble = document.getElementById('active-ai-bubble');
+        if (bubble) bubble.removeAttribute('id');
     }
     else if (event.type === 'harness_log') {
         let container = chatContainer.lastElementChild;
