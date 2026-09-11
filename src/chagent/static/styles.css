@@ -211,28 +211,66 @@ body {
 
 .tool-event {
     align-self: center;
+    width: 100%;
     max-width: 90%;
     background-color: var(--tool-msg-bg);
     border: 1px solid var(--tool-msg-border);
     border-radius: 8px;
-    padding: 8px 12px;
     font-size: 0.85rem;
     color: #fbbf24;
     display: flex;
-    align-items: flex-start;
-    gap: 8px;
+    flex-direction: column;
     animation: fadeIn 0.3s ease-out;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.tool-event:hover {
+    background-color: rgba(245, 158, 11, 0.2);
+}
+.tool-result:hover {
+    background-color: rgba(16, 185, 129, 0.2) !important;
+}
+
+.tool-event-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    gap: 8px;
+    user-select: none;
+}
+
+.tool-event-header span {
+    flex: 1;
+}
+
+.tool-event-header .chevron {
+    transition: transform 0.2s;
+}
+
+.tool-event.expanded .tool-event-header .chevron {
+    transform: rotate(180deg);
+}
+
+.tool-event-content {
+    display: none;
+    padding: 0 12px 8px 12px;
+}
+
+.tool-event.expanded .tool-event-content {
+    display: block;
+    animation: fadeIn 0.2s ease-out;
 }
 
 .tool-event pre {
-    margin-top: 4px;
+    margin: 0;
     background: rgba(0,0,0,0.2);
-    padding: 6px 10px;
+    padding: 8px 10px;
     border-radius: 4px;
     overflow-x: auto;
     font-size: 0.8rem;
     color: #d1d5db;
-    max-height: 200px;
+    max-height: 400px;
     white-space: pre-wrap;
     word-wrap: break-word;
 }
