@@ -212,8 +212,10 @@ class AsyncAgent:
                 
             self.history.append(msg_dict)
             
+            # Always close the active bubble from this pass
+            yield {"type": "finish"}
+            
             if not tool_calls:
-                yield {"type": "finish"}
                 break
                 
             for tool_call in tool_calls:

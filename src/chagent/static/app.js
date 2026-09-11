@@ -210,7 +210,6 @@ function handleAgentEvent(event) {
                                 <pre>${argsStr}</pre>
                             </div>
                         `;
-                        toolEl.querySelector('.tool-event-header').addEventListener('click', () => toolEl.classList.toggle('expanded'));
                         chatContainer.appendChild(toolEl);
                     });
                 }
@@ -238,7 +237,6 @@ function handleAgentEvent(event) {
                         <pre>${formattedContent}</pre>
                     </div>
                 `;
-                resEl.querySelector('.tool-event-header').addEventListener('click', () => resEl.classList.toggle('expanded'));
                 chatContainer.appendChild(resEl);
             }
         });
@@ -330,7 +328,6 @@ function handleAgentEvent(event) {
                 <pre>${argsStr}</pre>
             </div>
         `;
-        toolEl.querySelector('.tool-event-header').addEventListener('click', () => toolEl.classList.toggle('expanded'));
         chatContainer.appendChild(toolEl);
         scrollToBottom();
     }
@@ -359,7 +356,6 @@ function handleAgentEvent(event) {
                 <pre>${formattedContent}</pre>
             </div>
         `;
-        resEl.querySelector('.tool-event-header').addEventListener('click', () => resEl.classList.toggle('expanded'));
         chatContainer.appendChild(resEl);
         scrollToBottom();
     }
@@ -412,6 +408,17 @@ chatForm.addEventListener('submit', (e) => {
     
     messageInput.value = '';
     scrollToBottom();
+});
+
+// Event delegation for tool accordions
+chatContainer.addEventListener('click', (e) => {
+    const header = e.target.closest('.tool-event-header');
+    if (header) {
+        const toolEvent = header.closest('.tool-event');
+        if (toolEvent) {
+            toolEvent.classList.toggle('expanded');
+        }
+    }
 });
 
 // Init
