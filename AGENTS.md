@@ -21,6 +21,7 @@ Whenever you are asked to design a new feature or debug an architectural issue, 
 - The UI is designed to be "Premium" (Dark mode, glassmorphism, smooth animations).
 - Use Vanilla CSS and Vanilla JS. Avoid frameworks like React or Tailwind unless explicitly requested.
 - Maintain the current clean structure in `src/chagent/static/` (`index.html`, `styles.css`, `app.js`).
+- **Cache Busting**: Whenever you modify `app.js` or `styles.css`, you MUST increment the cache-busting parameter (e.g. `?v=4` to `?v=5`) in `src/chagent/static/index.html` to prevent the browser from serving stale cached files to the user.
 
 ## 4. Documentation & Changelog Rules
 - All changes must be tracked formally in `docs/CHANGELOG.md`.
