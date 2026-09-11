@@ -154,8 +154,8 @@ class AsyncAgent:
                     
             is_fallback = False
             
-            # Fallback for local models that output tool calls as JSON in content
-            if not tool_calls and current_content:
+            # Remove redundant tool calls from content to save tokens and clean UI
+            if current_content:
                 fallback_calls = []
                 decoder = json.JSONDecoder()
                 s = current_content
@@ -167,28 +167,33 @@ class AsyncAgent:
                     try:
                         obj, new_pos = decoder.raw_decode(s, pos)
                         if isinstance(obj, dict) and "name" in obj and "arguments" in obj:
-                            fallback_calls.append(obj)
+                            fallback_calls.append((obj, pos, new_pos))
                         pos = new_pos
                     except json.JSONDecodeError:
                         pos += 1
                         
                 if fallback_calls:
-                    tool_calls = []
-                    for idx, parsed in enumerate(fallback_calls):
-                        class MockToolCall:
-                            def __init__(self, id, name, arguments):
-                                self.id = id
-                                class Function:
-                                    def __init__(self, n, a):
-                                        self.name = n
-                                        self.arguments = a
-                                self.function = Function(name, arguments)
-                        
-                        args = parsed["arguments"]
-                        args_str = json.dumps(args) if isinstance(args, dict) else str(args)
-                        tool_calls.append(MockToolCall(id=f"call_fallback_{idx}", name=parsed["name"], arguments=args_str))
-                    
-                    is_fallback = True
+                    if not tool_calls:
+                        is_fallback = True
+                        tool_calls = []
+                        for idx, (parsed, _, _) in enumerate(fallback_calls):
+                            class MockToolCall:
+                                def __init__(self, id, name, arguments):
+                                    self.id = id
+                                    class Function:
+                                        def __init__(self, n, a):
+                                            self.name = n
+                                            self.arguments = a
+                                    self.function = Function(name, arguments)
+                            
+                            args = parsed["arguments"]
+                            args_str = json.dumps(args) if isinstance(args, dict) else str(args)
+                            tool_calls.append(MockToolCall(id=f"call_fallback_{idx}", name=parsed["name"], arguments=args_str))
+                    else:
+                        # tool_calls exist natively, so this JSON is redundant. Let's strip it!
+                        for _, start, end in reversed(fallback_calls):
+                            s = s[:start] + s[end:]
+                        current_content = s.strip()
 
             # Convert msg to dict for appending to messages
             msg_dict = {"role": "assistant"}
